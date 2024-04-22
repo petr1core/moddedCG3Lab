@@ -44,13 +44,13 @@ int main()
 	shader.setUniform("u_resolution", sf::Vector2f(w, h));
 
 	sf::Texture texture;
-	texture.loadFromFile("textures/texture.jpg");
+	texture.loadFromFile("../textures/magma.jpg");
 	sf::Texture brickTexture;
-	brickTexture.loadFromFile("textures/brick.jpg");
+	brickTexture.loadFromFile("../textures/paper.jpg");
 	sf::Texture woodTexture;
-	woodTexture.loadFromFile("textures/wood.jpg");
+	woodTexture.loadFromFile("../textures/justice.jpg");
 	sf::Texture marbleTexture;
-	marbleTexture.loadFromFile("textures/marble.jpg");
+	marbleTexture.loadFromFile("../textures/marble.jpg");
 
 	shader.setUniform("u_texture", texture);
 	shader.setUniform("u_brick_texture", brickTexture);

@@ -11,9 +11,10 @@ uniform int u_samples;
 uniform vec2 u_light;
 
 // const params
-const float MAX_DIST = 999.0;     // дистанция рендера || область видимости || длина луча
+const float MAX_DIST = 500.0;     // дистанция рендера || область видимости || длина луча
 const int MAX_REF = 6;         // кол-во отражений
 const int WHITE_BRIGHTNESS = 50;   // w канал луча, яркость всего изображения (поспроцессинг?????)
+
 // tex uniforms
 uniform sampler2D u_texture;
 uniform sampler2D u_brick_texture;
@@ -27,7 +28,7 @@ uvec4 R_STATE;                                         // хранение ранд. 4-векто
 uint TausStep(uint z, int S1, int S2, int S3, uint M)
 {
 	uint b = (((z << S1) ^ z) >> S2);
-	return (((z & M) << S3) ^ b);	
+	return (((z & M) << S3) ^ b);
 }
 
 uint LCGStep(uint z, uint A, uint C)

@@ -4,8 +4,8 @@
 
 int main()
 {
-	int w = 1920;    // window width
-	int h = 1080;    // window height
+	int w = 720;    // window width
+	int h = 640;    // window height
 	int mouseX = w / 2;    // mouse posX
 	int mouseY = h / 2;    // mouse posy
 	float mouseSensitivity = 3.0f;    // sens
@@ -19,7 +19,7 @@ int main()
 	sf::Vector2f lightPos = sf::Vector2f(0.0f, -1.0f);    // GI pos
 	bool is_rising = false;    // GI is underneath "earth"
 	int frames = 0, s = 0, fps = 0, minFps;   // counters
-	//sf::Vector2i delta = sf::Vector2i(1, 1);
+	sf::Vector2i delta = sf::Vector2i(1, 1);
 
 	sf::RenderWindow window(sf::VideoMode(w, h), "Ray tracing", sf::Style::Titlebar | sf::Style::Close);    // sfml window
 	window.setFramerateLimit(60);
@@ -167,10 +167,13 @@ int main()
 			shader.setUniform("u_seed2", sf::Vector2f((float)dist(e2), (float)dist(e2)) * 999.0f);
 			//^^^ Передача всех переменных во фрагментный шейдер
 			outputTexture.draw(firstTextureSpriteFlipped, &shader); // отправка на рендер
+
+			/// TODO: simple denoise
+
 			window.draw(outputTextureSprite);  // обновление изображения в окне на отрендеренное
 			window.display();
 			//___
-			/*if ((int)clock.getElapsedTime().asSeconds() - s) {
+			if ((int)clock.getElapsedTime().asSeconds() - s) {
 				s = clock.getElapsedTime().asSeconds();
 				fps = frames;
 				frames = 0;
@@ -186,7 +189,7 @@ int main()
 				else { delta = sf::Vector2i(1, 1); }
 				std::cout << "FPS: " << fps << ", Samples: " << samples << std::endl;
 			}
-			frames++;*/
+			frames++;
 			//^^^ debug статистика
 		}
 	}

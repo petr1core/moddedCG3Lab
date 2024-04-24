@@ -1,5 +1,6 @@
 #version 130
 
+// vecs & params uniforms
 uniform vec2 u_resolution;
 uniform vec2 u_mouse;
 uniform vec3 u_pos;
@@ -9,16 +10,20 @@ uniform vec2 u_seed2;
 uniform int u_samples;
 uniform vec2 u_light;
 
+// const params
+const float MAX_DIST = 999.0;     // дистанция рендера || область видимости || длина луча
+const int MAX_REF = 6;         // кол-во отражений
+const int WHITE_BRIGHTNESS = 50;   // w канал луча, яркость всего изображения (поспроцессинг?????)
+// tex uniforms
 uniform sampler2D u_texture;
 uniform sampler2D u_brick_texture;
 uniform sampler2D u_wood_texture;
 uniform sampler2D u_marble_texture;
 
-const float MAX_DIST = 99999.0;
-const int MAX_REF = 4;
-vec3 light = normalize(vec3(0.0, u_light.x, u_light.y));
-uvec4 R_STATE;
+vec3 light = normalize(vec3(0.0, u_light.x, u_light.y));   // направление света, нормализированный вектор
+uvec4 R_STATE;                                         // хранение ранд. 4-вектора(xyzw)
 
+// TausStep и LCGStep, задействованные в генерации радомных чисел https://www.shadertoy.com/view/4lfBzn (taus + lcgstep)
 uint TausStep(uint z, int S1, int S2, int S3, uint M)
 {
 	uint b = (((z << S1) ^ z) >> S2);
@@ -29,7 +34,9 @@ uint LCGStep(uint z, uint A, uint C)
 {
 	return (A * z + C);	
 }
+//----
 
+// Хеширование вектора
 vec2 hash22(vec2 p)
 {
 	p += u_seed1.x;
@@ -38,6 +45,7 @@ vec2 hash22(vec2 p)
 	return fract((p3.xx+p3.yz)*p3.zy);
 }
 
+// Ф-я генерации ранд. числа
 float random()
 {
 	R_STATE.x = TausStep(R_STATE.x, 13, 19, 12, uint(4294967294));
@@ -47,21 +55,24 @@ float random()
 	return 2.3283064365387e-10 * float((R_STATE.x ^ R_STATE.y ^ R_STATE.z ^ R_STATE.w));
 }
 
+// Вычисляет угол между вектором и осью x
 float atan2(vec2 dir)
 {
     float angle = asin(dir.x) > 0 ? acos(dir.y) : -acos(dir.y);
     return angle;
 }
 
+// Расчет линейного движения объекта (x - начальное положение, t - период движения, и d - задержка перед началом)
 float linearMotion(float x, float t, float d) 
 {
-	if (u_time < d) return 0.0;
-	float time = (u_time - d) - (t * floor((u_time - d) / t));
-	float dist = x * (time / t);
+	if (u_time < d) return 0.0;                                // если текущее время меньше задержки -> движение ещё не началось -> ничего не делаем
+	float time = (u_time - d) - (t * floor((u_time - d) / t));    // время движения с учётом задержки
+	float dist = x * (time / t);                              // пройденное расстояние к текущему моменту
 	if (time < t / 2.0) return dist;
 	else return -dist + x;
 }
 
+// Расчет линейного поворота объекта (x - начальный поворот, t - период поворота, и d - задержка перед началом)
 vec2 rotation(float r, float t, float d)
 {
 	float time = (u_time - d) - (t * floor((u_time - d) / t));
@@ -72,6 +83,7 @@ vec2 rotation(float r, float t, float d)
 	return vec2(x, y);
 }
 
+// Генерирует случайную точку на поверхности сферы
 vec3 randomOnSphere() {
 	vec3 rand = vec3(random(), random(), random());
 	float theta = rand.x * 2.0 * 3.14159265;
@@ -84,12 +96,14 @@ vec3 randomOnSphere() {
 	return vec3(x, y, z);
 }
 
-mat2 rot(float a) {
+// Матрица поворота на a(deg)
+mat2 rot(float a) {  
 	float s = sin(a);
 	float c = cos(a);
 	return mat2(c, -s, s, c);
 }
 
+// Пересечение луча с сферой
 vec2 sphIntersect(in vec3 ro, in vec3 rd, float ra) {
 	float b = dot(ro, rd);
 	float c = dot(ro, ro) - ra * ra;
@@ -99,6 +113,7 @@ vec2 sphIntersect(in vec3 ro, in vec3 rd, float ra) {
 	return vec2(-b - h, -b + h);
 }
 
+// Пересечение ли?? луча с сферой
 bool has_sphIntersection (vec3 ro, vec3 rd, vec4 sph) {
     vec3 v = ro - sph.xyz;
     float b = 2.0 * dot(rd, v);
@@ -111,6 +126,7 @@ bool has_sphIntersection (vec3 ro, vec3 rd, vec4 sph) {
     return s0 >= 0.0f || s1 >= 0.0f;
 }
 
+// Пересечение луча с кубом
 vec2 boxIntersection(in vec3 ro, in vec3 rd, in vec3 rad, out vec3 oN)  {
 	vec3 m = 1.0 / rd;
 	vec3 n = m * ro;
@@ -124,10 +140,12 @@ vec2 boxIntersection(in vec3 ro, in vec3 rd, in vec3 rad, out vec3 oN)  {
 	return vec2(tN, tF);
 }
 
+// Пересечение луча с плоскостью
 float plaIntersect(in vec3 ro, in vec3 rd, in vec4 p) {
 	return -(dot(ro, p.xyz) + p.w) / dot(rd, p.xyz);
 }
 
+// Пересечение луча с трисом
 vec3 triIntersection(in vec3 ro, in vec3 rd, in vec3 v0, in vec3 v1, in vec3 v2) {
 	vec3 v1v0 = v1 - v0;
 	vec3 v2v0 = v2 - v0;
@@ -144,6 +162,7 @@ vec3 triIntersection(in vec3 ro, in vec3 rd, in vec3 v0, in vec3 v1, in vec3 v2)
 	return vec3(t, u, v);
 }
 
+// Пересечение луча с циллиндром
 vec4 cylIntersection(in vec3 ro, in vec3 rd, in vec3 pa, in vec3 pb, float ra) {
 	vec3 ca = pb - pa;
 	vec3 oc = ro - pa;
@@ -164,7 +183,8 @@ vec4 cylIntersection(in vec3 ro, in vec3 rd, in vec3 pa, in vec3 pb, float ra) {
 	return vec4(-1.0);
 }
 
-vec3 getSky(vec3 rd) {
+// Цвет пикселя неба в зависимости от направления луча и освещения
+vec3 getSky(vec3 rd) {             
 	vec3 col = vec3(0.4, 0.6, 1.0);
 	vec3 sun = vec3(0.95, 0.9, 1.0);
 	sun *= max(0.0, pow(dot(rd, light), 128.0));
@@ -172,6 +192,7 @@ vec3 getSky(vec3 rd) {
 	return clamp(sun + col * 0.01, 0.0, 1.0);
 }
 
+// Маппинг текстуры на поверхность
 vec2 mapTexture(vec3 p, vec3 n, vec3 pos, int mode) {
 	vec3 point = (p - pos);
     vec2 result = vec2(0);
@@ -201,6 +222,7 @@ vec2 mapTexture(vec3 p, vec3 n, vec3 pos, int mode) {
     return result;
 }
 
+// Призма с заданным количеством граней, высотой и радиусом относительно заданной позиции
 mat3x3[40] Prism(int faces, float h, float ra, vec3 pos) {
 	mat3x3[40] triangles;
 	if (faces > 10) return triangles;
@@ -229,6 +251,7 @@ mat3x3[40] Prism(int faces, float h, float ra, vec3 pos) {
 	return triangles;
 }
 
+// Пирамида с заданным количеством граней, высотой и радиусом относительно заданной позиции
 mat3x3[20] Pyramid(int faces, float h, float ra, vec3 pos) {
 	mat3x3[20] triangles;
 	if (faces > 10) return triangles;
@@ -246,6 +269,7 @@ mat3x3[20] Pyramid(int faces, float h, float ra, vec3 pos) {
 	return triangles;
 }
 
+// Пересечение луча с различными объектами
 float[9] colliderIntersection(vec3 ro, vec3 rd, int colliderId) {
 	vec4 col;
 	vec2 minIt = vec2(MAX_DIST);
@@ -330,7 +354,8 @@ float[9] colliderIntersection(vec3 ro, vec3 rd, int colliderId) {
 	}
 
 	if (colliderId == 1) {
-		
+		// Модель убрана из-за чрезмерного пожирания ресурсов
+		//TODO возможность добавления своей модели из .gltf/.fbx...
 	}
 
 	if (colliderId == 2) {
@@ -480,6 +505,7 @@ float[9] colliderIntersection(vec3 ro, vec3 rd, int colliderId) {
 	return result;
 }
 
+// Трассирование луча, возвращает цвет для луча
 vec4 castRay(inout vec3 ro, inout vec3 rd) {
 	vec4 col;
 	vec2 minIt = vec2(MAX_DIST);
@@ -488,7 +514,7 @@ vec4 castRay(inout vec3 ro, inout vec3 rd) {
 
 	vec4 colliders[5];
 	colliders[0] = vec4(42.0, 5.0, 0.0, 11.0); // Simple geometric bodies
-	colliders[1] = vec4(-2.0, 0.0, 0.0, 11.0); // 3D car model
+	colliders[1] = vec4(-2.0, 0.0, 0.0, 11.0); // 3D model
 	colliders[2] = vec4(40.0, 5.0, 0.0, 1.0); // Dodecahedron
 	colliders[3] = vec4(43.5, 3.0, 0.6, 1.8); // Tetrahedron
 	colliders[4] = vec4(44.0, 9.5, 0.0, 2.0); // Prism
@@ -534,6 +560,7 @@ vec4 castRay(inout vec3 ro, inout vec3 rd) {
 	return col;
 }
 
+// Отслеживает лучи и возвращает цвет, трассировка
 vec3 traceRay(vec3 ro, vec3 rd) {
 	vec3 col = vec3(1.0);
 	for (int i = 0; i < MAX_REF; i++)
@@ -545,6 +572,7 @@ vec3 traceRay(vec3 ro, vec3 rd) {
 	return vec3(0.0);
 }
 
+// Основная логика шейдера, генерация лучей, отслеживание лучей, возвращение цвета фраг. шейдера
 void main() {
 	vec2 uv = (gl_TexCoord[0].xy - 0.5) * u_resolution / u_resolution.y;
 	vec2 uvRes = hash22(uv + 1.0) * u_resolution + u_resolution;
@@ -563,7 +591,7 @@ void main() {
 	}
 	col /= samples;
 
-	float white = 20.0;
+	float white = WHITE_BRIGHTNESS;
 	col *= white * 16.0;
 	col = (col * (1.0 + col / white / white)) / (1.0 + col);
 	gl_FragColor = vec4(col, 1.0);
